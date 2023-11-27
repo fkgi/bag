@@ -1,0 +1,1 @@
+ibag -diameter-local sctp://bsf.epc.mnc99.mcc999.3gppnetwork.org -diameter-peer sctp://dra1.epc.mnc99.mcc999.3gppnetwork.org -bsf-local bsf:8081 -naf-local bsf:8080

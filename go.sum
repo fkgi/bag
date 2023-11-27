@@ -1,0 +1,4 @@
+github.com/fkgi/abnf v1.0.0 h1:LRI4H3tThtKWAYAn0TEouoyTGXYmueDpeQPlIpMQtr8=
+github.com/fkgi/abnf v1.0.0/go.mod h1:a3L26ADSEPc8xE7Gdf8OkzjtsGFvlfzQuGJhG+DfI0E=
+github.com/fkgi/diameter v0.0.0-20231122231458-368352e2bf2d h1:IdzX6/wzJDzaCOtTDJncPAokAA5Gl9ImNljDDlyapf4=
+github.com/fkgi/diameter v0.0.0-20231122231458-368352e2bf2d/go.mod h1:yBsfO9w5k6YL3M69DuXs03GjNSVsIVCHxRSYTOHRToM=
