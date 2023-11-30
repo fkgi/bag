@@ -4,9 +4,10 @@ import (
 	"encoding/hex"
 	"encoding/xml"
 	"errors"
+	"fmt"
 	"io"
-	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/fkgi/bag"
@@ -33,7 +34,7 @@ func bootstrap() (string, error) {
 			auth.Uri = "/"
 		}
 		if bsfAuth.Nonce != "" {
-			log.Println("BSF nonce found, adding Authorization header")
+			fmt.Println("BSF nonce found, adding Authorization header")
 			auth.Nonce = bsfAuth.Nonce
 			auth.Cnonce = bag.NewRandText()
 			auth.Opaque = bsfAuth.Opaque
@@ -50,11 +51,20 @@ func bootstrap() (string, error) {
 		req.Header.Set("User-Agent", uaPrefix+"3gpp-gba")
 		req.Header.Set("Accept", "*/*")
 
-		log.Println("bootstrapping to", bsfurl)
+		fmt.Println("bootstrapping to", bsfurl)
+		fmt.Println(">", req.Method, req.URL, req.Proto)
+		fmt.Println(">", "Host :", req.Host)
+		for k, v := range req.Header {
+			fmt.Println(">", k, ":", strings.Join(v, ", "))
+		}
 		res, e := bsfClient.Do(req)
 		if e != nil {
 			e = errors.Join(errors.New("failed to access BSF"), e)
 			return "", e
+		}
+		fmt.Println("<", res.Proto, res.Status)
+		for k, v := range res.Header {
+			fmt.Println("<", k, ":", strings.Join(v, ", "))
 		}
 
 		switch res.StatusCode {
@@ -68,10 +78,10 @@ func bootstrap() (string, error) {
 		case http.StatusOK:
 			authInfo, e := bag.ParseaAuthenticationInfo(
 				res.Header.Get("Authentication-Info"))
-			if e != nil {
+			if e == nil {
 				bsfAuth.Nonce = authInfo.Nextnonce
 			} else {
-				log.Println("BSF returns invalid Authentication-Info header:", e)
+				fmt.Println("BSF returns invalid Authentication-Info header:", e)
 			}
 
 			data, _ := io.ReadAll(res.Body)
@@ -83,7 +93,7 @@ func bootstrap() (string, error) {
 		default:
 			return "", errors.New("invalid BSF response" + res.Status)
 		}
-		log.Println("retrying BSF access")
+		fmt.Println("retrying BSF access")
 	}
 
 	return "", errors.New("bootstraping authentication retry count expired")

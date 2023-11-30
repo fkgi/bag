@@ -1,0 +1,59 @@
+﻿BSF,with IMPI,bootstrap success,qop,auth,qop=authで認証に成功すること
+,,,,auth-int,qop=auth-intで認証に成功すること
+,,,scheme,Digest-AKAv1-MD5,認証方式としてDigest-AKAv1-MD5を用いて認証に成功すること
+,,,,SIP Digest,認証方式としてSIP-Digestを用いて認証に成功すること
+,,bootstrap fail,HSS error,unknown IMPI,HSSに登録されていないユーザの認証に失敗すること
+,,,,HSS busy,HSSが過負荷エラー応答を返した場合にユーザ認証に失敗すること
+,,,,HSS error,HSSがその他のエラーでエラー応答を返した場合にユーザ認証に失敗すること
+,,,invalid Authorization header,invalid RES,端末からのRES値がHSSからのXRES値と異なる場合にユーザ認証に失敗すること
+,,,,invalid nonce,端末からのnonce値がBSFからの指定と異なる場合にユーザ認証に失敗すること
+,,,,invalid opaque,端末からのopaque値がBSFからの指定と異なる場合にユーザ認証に失敗すること
+,,invalid SQN,,,端末が想定するSQN値とHSSから取得したSQN値に差分がある場合、端末の要求に従って再度HSSから認証ベクトルを取得すること
+,,GUSS,,,対象外
+,,2nd bootstrap success,Authorization value from nextnonce,,初回認証成功時にBSFから指定されたnextnonceを用いて再度認証に成功すること
+,,2nd bootstrap fail,Authorization value from nextnonce,,初回認証成功時にBSFから指定されたnextnonceと異なる値を用いて再認証に失敗すること
+,,TLS connection,no TLS,,TLSを用いず接続できること
+,,,TLS_RSA_WITH_3DES_EDE_CBC_SHA,,該当のTLS暗号スイートを用いてTLS接続できること
+,,,TLS_DHE_RSA_WITH_3DES_EDE_CBC_SHA,,該当のTLS暗号スイートを用いてTLS接続できること
+,,,TLS_RSA_WITH_AES_128_CBC_SHA,,該当のTLS暗号スイートを用いてTLS接続できること
+,,,TLS_DHE_RSA_WITH_AES_128_CBC_SHA,,該当のTLS暗号スイートを用いてTLS接続できること
+,,,TLS_RSA_WITH_AES_256_CBC_SHA,,該当のTLS暗号スイートを用いてTLS接続できること
+,,,TLS_DHE_RSA_WITH_AES_256_CBC_SHA,,該当のTLS暗号スイートを用いてTLS接続できること
+,,,TLS_RSA_WITH_AES_128_CBC_SHA256,,該当のTLS暗号スイートを用いてTLS接続できること
+,,,TLS_RSA_WITH_AES_256_CBC_SHA256,,該当のTLS暗号スイートを用いてTLS接続できること
+,,,TLS_ECDHE_RSA_WITH_3DES_EDE_CBC_SHA,,該当のTLS暗号スイートを用いてTLS接続できること
+,with TPMI,,,,対象外
+NAF,GBA_ME,authentication success,method,GET,HTTP GET要求がTASへ転送され成功すること
+,,,,POST,HTTP POST要求がTASへ転送され成功すること
+,,,,PUT,HTTP PUT要求がTASへ転送され成功すること
+,,,,DELETE,HTTP DELETE要求がTASへ転送され成功すること
+,,,X-3GPP-Asserted-Identity,from X-3GPP-Intended-Identity without GUSS,GUSSを参照せずX-3GPP-Intended-Identity値をX-3GPP-Asserted-Identityへコピーすること
+,,,,from X-3GPP-Intended-Identity with verification by GUSS,GUSSの加入者識別子と比較したうえでX-3GPP-Intended-Identity値をX-3GPP-Asserted-Identityへコピーすること
+,,,,from GUSS,GUSSの加入者識別子の値をX-3GPP-Asserted-Identityへコピーすること
+,,,qop,auth,qop=authで認証に成功すること
+,,,,auth-int,qop=auth-intで認証に成功すること
+,,bootstrap request,no Authorization Header,GET,Authorizationヘッダを含まないHTTP GET要求に対してブートストラップ要求を応答すること
+,,,,POST,Authorizationヘッダを含まないHTTP POST要求に対してブートストラップ要求を応答すること
+,,,,PUT,Authorizationヘッダを含まないHTTP PUT要求に対してブートストラップ要求を応答すること
+,,,,DELETE,Authorizationヘッダを含まないHTTP DELETE要求に対してブートストラップ要求を応答すること
+,,,invalid B-TID,expired,端末からのB-TID値が期限切れである場合にユーザ認証に失敗して再度ブートストラップ要求を応答すること
+,,authentication fail,invalid Authorization Header,invalid Ks,端末からのresponse値がBSF側のKsに基づく値と異なる場合にユーザ認証に失敗すること
+,,,,invalid nonce,端末からのnonce値がNAFからの指定と異なる場合にユーザ認証に失敗すること
+,,,,invalid opaque,端末からのopaque値がNAFからの指定と異なる場合にユーザ認証に失敗すること
+,,,invalid B-TID,unknown,端末からのB-TID値が未知である場合にユーザ認証に失敗すること
+,,,,with invalid BSF FQDN,端末からのB-TID値で指定されたBSFが不正である場合にユーザ認証に失敗すること
+,,transfer fail,unknown destination,,端末からのHTTPリクエストで指定されたホストに対する名前解決ができない時にエラー応答を返すこと
+,,2nd bootstrap success,Authorization value from nextnonce,,初回認証成功時にNAFから指定されたnextnonceを用いて再度認証に成功すること
+,,2nd bootstrap fail,Authorization value from nextnonce,,初回認証成功時にNAFから指定されたnextnonceと異なる値を用いて再認証に失敗すること
+,,TLS connection,no TLS,,TLSを用いず接続できること
+,,,TLS_RSA_WITH_3DES_EDE_CBC_SHA,,該当のTLS暗号スイートを用いてTLS接続できること
+,,,TLS_DHE_RSA_WITH_3DES_EDE_CBC_SHA,,該当のTLS暗号スイートを用いてTLS接続できること
+,,,TLS_RSA_WITH_AES_128_CBC_SHA,,該当のTLS暗号スイートを用いてTLS接続できること
+,,,TLS_DHE_RSA_WITH_AES_128_CBC_SHA,,該当のTLS暗号スイートを用いてTLS接続できること
+,,,TLS_RSA_WITH_AES_256_CBC_SHA,,該当のTLS暗号スイートを用いてTLS接続できること
+,,,TLS_DHE_RSA_WITH_AES_256_CBC_SHA,,該当のTLS暗号スイートを用いてTLS接続できること
+,,,TLS_RSA_WITH_AES_128_CBC_SHA256,,該当のTLS暗号スイートを用いてTLS接続できること
+,,,TLS_RSA_WITH_AES_256_CBC_SHA256,,該当のTLS暗号スイートを用いてTLS接続できること
+,,,TLS_ECDHE_RSA_WITH_3DES_EDE_CBC_SHA,,該当のTLS暗号スイートを用いてTLS接続できること
+,GBA_U,-,,,対象外
+,2G_GBA,-,,,対象外

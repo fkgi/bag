@@ -6,8 +6,10 @@ import (
 	"encoding/json"
 	"errors"
 	"flag"
+	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/fkgi/bag"
@@ -44,30 +46,34 @@ func main() {
 	flag.StringVar(&localaddr, "l", localaddr, "listening address for HTTP proxy")
 	flag.Parse()
 
-	log.Println("registering authantication vector for", impi)
+	fmt.Println("registering authantication vector for", impi)
 	rand.Read(av.RAND)
-	log.Printf("RAND = %x\n", av.RAND)
+	fmt.Printf("RAND = %x\n", av.RAND)
 	rand.Read(av.AUTN)
-	log.Printf("AUTN = %x\n", av.AUTN)
+	fmt.Printf("AUTN = %x\n", av.AUTN)
 	rand.Read(av.RES)
-	log.Printf("RES  = %x\n", av.RES)
+	fmt.Printf("RES  = %x\n", av.RES)
 	rand.Read(av.IK)
-	log.Printf("IK   = %x\n", av.IK)
+	fmt.Printf("IK   = %x\n", av.IK)
 	rand.Read(av.CK)
-	log.Printf("CK   = %x\n", av.CK)
+	fmt.Printf("CK   = %x\n", av.CK)
 
 	if d, e := json.Marshal(av); e != nil {
-		log.Fatalln("failed register authentication vector:", e)
+		fmt.Fprintln(os.Stderr, "[ERR]", "failed register authentication vector:", e)
+		os.Exit(1)
 	} else if req, e := http.NewRequest(http.MethodPut, hssurl+"/"+impi, bytes.NewBuffer(d)); e != nil {
-		log.Fatalln("failed register authentication vector:", e)
+		fmt.Fprintln(os.Stderr, "[ERR]", "failed register authentication vector:", e)
+		os.Exit(1)
 	} else if res, e := new(http.Client).Do(req); e != nil {
-		log.Fatalln("failed register authentication vector:", e)
+		fmt.Fprintln(os.Stderr, "[ERR]", "failed register authentication vector:", e)
+		os.Exit(1)
 	} else if res.StatusCode != http.StatusOK {
-		log.Fatalln("failed register authentication vector:", "server returns", res.Status)
+		fmt.Fprintln(os.Stderr, "[ERR]", "failed register authentication vector:", "server returns", res.Status)
+		os.Exit(1)
 	}
 
 	ch := make(chan error)
-	log.Println("listening HTTP request on", localaddr)
+	fmt.Println("listening HTTP request on", localaddr)
 	go func() {
 		ch <- errors.Join(errors.New("HTTP is closed"),
 			http.ListenAndServe(localaddr, http.HandlerFunc(gbaClientHandler)))

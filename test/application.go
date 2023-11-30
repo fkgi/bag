@@ -5,9 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/fkgi/bag"
@@ -19,15 +19,27 @@ var (
 	btid      string
 )
 
+var hopHeaders = []string{
+	"Connection",
+	"Proxy-Connection",
+	"Keep-Alive",
+	"Proxy-Authenticate",
+	"Proxy-Authorization",
+	"Te",
+	"Trailer",
+	"Transfer-Encoding",
+	"Upgrade",
+}
+
 func errorResult(w http.ResponseWriter, code int, e error) {
-	log.Println(e)
+	fmt.Println(e)
 	w.Header().Set("Content-Type", "text/plain")
 	w.WriteHeader(code)
 	fmt.Fprint(w, e)
 }
 
 func gbaClientHandler(w http.ResponseWriter, r *http.Request) {
-	log.Println("new HTTP request:", r.Method, r.RequestURI)
+	fmt.Println("*", "new HTTP request:", r.Method, r.RequestURI)
 
 	if nafClient == nil {
 		proxy, e := url.Parse(nafurl)
@@ -51,8 +63,20 @@ func gbaClientHandler(w http.ResponseWriter, r *http.Request) {
 
 	for i := 0; i < authRetransmit; i++ {
 		req, _ := http.NewRequest(r.Method, r.RequestURI, bytes.NewReader(reqbody))
+		req.Header = r.Header.Clone()
+		for _, h := range hopHeaders {
+			hv := req.Header.Get(h)
+			if hv == "" {
+				continue
+			}
+			if h == "Te" && hv == "trailers" {
+				continue
+			}
+			req.Header.Del(h)
+		}
+
 		if btid != "" && nafAuth.Nonce != "" {
-			log.Println("B-TID and NAF nonce found, adding Authorization header")
+			fmt.Println("B-TID and NAF nonce found, adding Authorization header")
 			nc++
 			auth := bag.Authorization{
 				Username: btid,
@@ -83,12 +107,21 @@ func gbaClientHandler(w http.ResponseWriter, r *http.Request) {
 			req.Header.Set("X-3GPP-Intended-Identity", impu)
 		}
 
-		log.Println("transfer request to NAF", nafurl)
+		fmt.Println("transfer request to NAF", nafurl)
+		fmt.Println(">", req.Method, req.URL, req.Proto)
+		fmt.Println(">", "Host :", req.Host)
+		for k, v := range req.Header {
+			fmt.Println(">", k, ":", strings.Join(v, ", "))
+		}
 		res, e := nafClient.Do(req)
 		if e != nil {
 			errorResult(w, http.StatusBadGateway,
 				errors.Join(errors.New("failed to access NAF"), e))
 			return
+		}
+		fmt.Println("<", res.Proto, res.Status)
+		for k, v := range res.Header {
+			fmt.Println("<", k, ":", strings.Join(v, ", "))
 		}
 
 		if res.StatusCode != http.StatusUnauthorized {
@@ -97,7 +130,7 @@ func gbaClientHandler(w http.ResponseWriter, r *http.Request) {
 			if e == nil {
 				nafAuth.Nonce = authInfo.Nextnonce
 			} else {
-				log.Println("NAF returns invalid Authentication-Info header:", e)
+				fmt.Println("NAF returns invalid Authentication-Info header:", e)
 			}
 
 			resbody, _ := io.ReadAll(res.Body)
@@ -110,7 +143,7 @@ func gbaClientHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		log.Println("BSF authentication is required")
+		fmt.Println("BSF authentication is required")
 		nafAuth, e = bag.ParseaWWWAuthenticate(res.Header.Get("WWW-Authenticate"))
 		if e != nil {
 			errorResult(w, http.StatusBadGateway,
@@ -124,8 +157,8 @@ func gbaClientHandler(w http.ResponseWriter, r *http.Request) {
 				errors.Join(errors.New("bootstrap to BFS failed"), e))
 			return
 		}
-		log.Println("BSF authentication success")
-		log.Println("retrying NAF access")
+		fmt.Println("BSF authentication success")
+		fmt.Println("retrying NAF access")
 	}
 
 	errorResult(w, http.StatusForbidden,
