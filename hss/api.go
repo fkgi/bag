@@ -11,6 +11,25 @@ import (
 )
 
 func apiHandler(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path == "" {
+		switch r.Method {
+		case http.MethodGet:
+			if data, e := json.Marshal(avs); e != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				log.Println("prov fail:", "unable to marshal getting data list:", e)
+			} else {
+				w.Header().Add("content-type", "application/json")
+				w.WriteHeader(http.StatusOK)
+				w.Write(data)
+				log.Println("prov success:", "get data list")
+			}
+		default:
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			log.Println("prov fail:", "unallowed method:", r.Method)
+		}
+		return
+	}
+
 	p := strings.Split(r.URL.Path, "/")
 	if len(p) != 2 {
 		w.WriteHeader(http.StatusNotFound)

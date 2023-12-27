@@ -157,10 +157,10 @@ func GetSIPAuthDataItem(a diameter.AVP) (rand, autn, auts, xres, ck, ik []byte, 
 			break
 		}
 	}
-
 	return
 }
 
 // GUSS-Timestamp
 
+// IdentityUnknown Diameter response code
 const IdentityUnknown uint32 = 10415*10000 + 5401

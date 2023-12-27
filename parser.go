@@ -234,6 +234,7 @@ type Authorization struct {
 	Qop       string // mandatory, not quoted
 	Nc        uint64 // not quoted
 	// Userhash bool
+	Auts string
 }
 
 func ParseaAuthorization(s string) (a Authorization, e error) {
@@ -258,7 +259,7 @@ func ParseaAuthorization(s string) (a Authorization, e error) {
 		e = errors.New("nonce not found")
 		return
 	}
-	a.Uri = p["uri"]
+	a.Uri, ok = p["uri"]
 	if !ok {
 		e = errors.New("uri not found")
 		return
@@ -279,6 +280,7 @@ func ParseaAuthorization(s string) (a Authorization, e error) {
 	a.Opaque = p["opaque"]
 	a.Qop = p["qop"]
 	a.Nc, _ = strconv.ParseUint(p["nc"], 16, 64)
+	a.Auts = p["auts"]
 	return
 }
 
@@ -306,18 +308,20 @@ func (a Authorization) String() string {
 	if a.Nc != 0 {
 		fmt.Fprintf(buf, `, nc=%08x`, a.Nc)
 	}
+	if a.Auts != "" {
+		fmt.Fprintf(buf, `, auts="%s"`, a.Auts)
+	}
 	return buf.String()
 }
 
-func (a *Authorization) SetResponse(method, pwd string, body []byte) {
-	a1 := md5.Sum([]byte(a.Username + ":" + a.Realm + ":" + pwd))
+func (a *Authorization) SetResponse(method string, pwd, body []byte) {
+	a1 := md5.Sum(append([]byte(a.Username+":"+a.Realm+":"), pwd...))
 	a2 := md5.Sum(body)
 	if a.Qop == "auth-int" {
 		a2 = md5.Sum([]byte(fmt.Sprintf("%s:%s:%s",
 			method, a.Uri, hex.EncodeToString(a2[:]))))
 	} else {
-		a2 = md5.Sum([]byte(fmt.Sprintf("%s:%s",
-			method, a.Uri)))
+		a2 = md5.Sum([]byte(fmt.Sprintf("%s:%s", method, a.Uri)))
 	}
 	a.Response = md5.Sum([]byte(fmt.Sprintf("%x:%s:%08x:%s:%s:%x",
 		a1, a.Nonce, a.Nc, a.Cnonce, a.Qop, a2)))
