@@ -5,6 +5,7 @@ import (
 	"log"
 
 	"github.com/fkgi/bag"
+	"github.com/fkgi/bag/common"
 	"github.com/fkgi/diameter"
 )
 
@@ -49,6 +50,8 @@ func marHandler(retry bool, avps []diameter.AVP) (bool, []diameter.AVP) {
 
 	result := diameter.Success
 	auth := diameter.AVP{}
+	av := bag.AV{}
+
 	if iavp, ok := e.(diameter.InvalidAVP); ok {
 		result = iavp.Code
 	} else if len(impi) == 0 {
@@ -57,7 +60,13 @@ func marHandler(retry bool, avps []diameter.AVP) (bool, []diameter.AVP) {
 	} else if len(session) == 0 {
 		result = diameter.MissingAvp
 		e = diameter.InvalidAVP{Code: result, AVP: diameter.SetSessionID("")}
-	} else if av, ok := avs[impi]; !ok {
+	} else if e = enc.Encode(common.DbReq{IMPI: impi}); e != nil {
+		log.Println("[ERR]", "faild to access to DB RPC:", e)
+		result = diameter.UnableToComply
+	} else if e = dec.Decode(&av); e != nil {
+		log.Println("[ERR]", "faild to access to DB RPC:", e)
+		result = diameter.UnableToComply
+	} else if len(av.RAND) == 0 {
 		result = bag.IdentityUnknown
 		e = errors.New("identity not found")
 	} else {
@@ -80,13 +89,19 @@ func marHandler(retry bool, avps []diameter.AVP) (bool, []diameter.AVP) {
 		res = append(res,
 			auth,
 			diameter.SetUserName(impi))
-		log.Println("service success: IMPI is", impi)
+		if *verbose {
+			log.Println("[INFO]", "MAR handling for", impi, "success")
+		}
 	} else if len(impi) == 0 {
-		log.Println("service fail:", e)
+		if *verbose {
+			log.Println("[INFO]", "MAR handling fail:", e)
+		}
 	} else {
 		res = append(res,
 			diameter.SetUserName(impi))
-		log.Println("service fail: IMPI is", impi, ":", e)
+		if *verbose {
+			log.Println("[INFO]", "MAR handling for", impi, "fail:", e)
+		}
 	}
 	return false, res
 }

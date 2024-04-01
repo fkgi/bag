@@ -1,1 +1,0 @@
-curl http://google.co.jp -x http://localhost:8080 -v

@@ -3,6 +3,7 @@ package bag
 import (
 	"bytes"
 	"crypto/md5"
+	"encoding/base64"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -325,6 +326,10 @@ func (a *Authorization) SetResponse(method string, pwd, body []byte) {
 	}
 	a.Response = md5.Sum([]byte(fmt.Sprintf("%x:%s:%08x:%s:%s:%x",
 		a1, a.Nonce, a.Nc, a.Cnonce, a.Qop, a2)))
+}
+
+func (a *Authorization) SetBootstrapNonce(rand, autn []byte) {
+	a.Nonce = base64.StdEncoding.EncodeToString(append(rand, autn...))
 }
 
 type AuthenticationInfo struct {

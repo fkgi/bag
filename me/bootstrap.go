@@ -14,13 +14,13 @@ import (
 	"github.com/fkgi/bag"
 )
 
-func bootstrap() (string, error) {
+func bootstrap(av bag.AV) (string, error) {
 	bsfAuth := bag.WWWAuthenticate{}
 
 	for i := 0; i < authRetransmit; i++ {
 		req, _ := http.NewRequest(http.MethodGet, bsf, nil)
 		auth := bag.Authorization{
-			Username: impi,
+			Username: av.IMPI,
 			Realm:    req.Host,
 			Uri:      req.URL.Path}
 		if auth.Uri == "" {
@@ -42,7 +42,7 @@ func bootstrap() (string, error) {
 			if bytes.Equal(d[16:], av.AUTN) {
 				auth.SetResponse(req.Method, av.RES, []byte{})
 			} else {
-				registerAV()
+				// registerAV()
 				auth.SetResponse(req.Method, []byte{}, []byte{})
 				auth.Auts = base64.StdEncoding.EncodeToString(
 					append(av.AUTN[:6], av.AUTN[8:]...))
@@ -93,8 +93,8 @@ func bootstrap() (string, error) {
 
 			fmt.Println()
 			fmt.Println("[INFO]", "AKA authentication is required")
-			fmt.Printf("  RAND = %x\n", d[:16])
-			fmt.Printf("  AUTN = %x\n", d[16:])
+			fmt.Printf("  | RAND = %x\n", d[:16])
+			fmt.Printf("  | AUTN = %x\n", d[16:])
 		case http.StatusOK:
 			/*
 				authInfo, e := bag.ParseaAuthenticationInfo(

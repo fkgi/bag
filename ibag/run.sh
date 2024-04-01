@@ -1,1 +1,1 @@
-ibag -diameter-local sctp://bsf.epc.mnc99.mcc999.3gppnetwork.org -diameter-peer sctp://dra1.epc.mnc99.mcc999.3gppnetwork.org -bsf-local 10.255.201.106:8080 -naf-local 10.255.202.106:8080
+./ibag -diameter-local tcp://bsf.mnc99.mcc999.3gppnetwork.org -diameter-peer tcp://dra1.mnc99.mcc999.3gppnetwork.org -bsf-local 10.255.201.106 -naf-local 10.255.202.106 -crt ~/server.crt -key ~/server.key
