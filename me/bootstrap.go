@@ -52,19 +52,16 @@ func bootstrap(av bag.AV) (string, error) {
 		req.Header.Set("User-Agent", uaPrefix+"3gpp-gba")
 		req.Header.Set("Accept", "*/*")
 
-		fmt.Println()
-		fmt.Println("[INFO]", "bootstrapping to", req.Host)
+		fmt.Println("\n", "[INFO]", "bootstrapping to", req.Host)
 		fmt.Println("  >", req.Method, req.URL, req.Proto)
 		fmt.Println("  >", "Host :", req.Host)
-		for k, v := range req.Header {
-			fmt.Println("  >", k, ":", strings.Join(v, ", "))
-		}
+		logHeader(req.Header, "  >")
+
 		res, e := client.Do(req)
 		if e != nil {
 			return "", fmt.Errorf("failed to access BSF: %s", e)
 		}
-		fmt.Println()
-		fmt.Println("[INFO]", "response from BSF", req.Host)
+		fmt.Println("\n", "[INFO]", "response from BSF", req.Host)
 		if res.TLS == nil {
 			fmt.Println("[INFO]", "connection is not TLS")
 		} else {
@@ -72,9 +69,7 @@ func bootstrap(av bag.AV) (string, error) {
 				tls.CipherSuiteName(res.TLS.CipherSuite))
 		}
 		fmt.Println("  <", res.Proto, res.Status)
-		for k, v := range res.Header {
-			fmt.Println("  <", k, ":", strings.Join(v, ", "))
-		}
+		logHeader(res.Header, "  <")
 
 		switch res.StatusCode {
 		case http.StatusUnauthorized:
@@ -91,8 +86,7 @@ func bootstrap(av bag.AV) (string, error) {
 					"data size is not 16+16 octets")
 			}
 
-			fmt.Println()
-			fmt.Println("[INFO]", "AKA authentication is required")
+			fmt.Println("\n", "[INFO]", "AKA authentication is required")
 			fmt.Printf("  | RAND = %x\n", d[:16])
 			fmt.Printf("  | AUTN = %x\n", d[16:])
 		case http.StatusOK:
@@ -123,9 +117,36 @@ func bootstrap(av bag.AV) (string, error) {
 		default:
 			return "", errors.New("unexpected BSF response " + res.Status)
 		}
-		fmt.Println()
-		fmt.Println("[INFO]", "retrying BSF access")
+		fmt.Println("\n", "[INFO]", "retrying BSF access")
 	}
 
 	return "", errors.New("bootstraping authentication retry count exceeded")
+}
+
+func logHeader(h http.Header, prefix string) {
+	for k, v := range h {
+		lk := strings.ToLower(k)
+		if lk == "www-authenticate" || lk == "authorization" || lk == "authentication-info" {
+			s := strings.TrimSpace(v[0])
+			ss := strings.SplitN(strings.TrimSpace(s), " ", 2)
+
+			buf := new(bytes.Buffer)
+			buf.WriteString(prefix)
+			buf.WriteRune(' ')
+			buf.WriteString(k)
+			buf.WriteString(" : ")
+			buf.WriteString(ss[0])
+			buf.WriteRune('\n')
+
+			for _, s = range strings.Split(strings.TrimSpace(ss[1]), ",") {
+				buf.WriteString(prefix)
+				buf.WriteString("   ")
+				buf.WriteString(strings.TrimSpace(s))
+				buf.WriteRune('\n')
+			}
+			fmt.Print(buf.String())
+		} else {
+			fmt.Println(prefix, k, ":", strings.Join(v, ", "))
+		}
+	}
 }

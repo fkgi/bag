@@ -6,6 +6,12 @@ type MeReq struct {
 	IMPI       string
 	IMPU       string
 	Body       []byte
+	RAND       []byte
+	AUTN       []byte
+	RES        []byte
+	IK         []byte
+	CK         []byte
+	ClearCache bool
 }
 
 type MeAns struct {

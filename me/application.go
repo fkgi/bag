@@ -11,7 +11,6 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"strings"
 
 	"github.com/fkgi/bag"
 	"github.com/fkgi/bag/common"
@@ -48,8 +47,7 @@ func gbaClientSession(c net.Conn) {
 }
 
 func errorResult(code int, e error) common.MeAns {
-	fmt.Println()
-	fmt.Fprintln(os.Stderr, "[ERR]", "NAF procedure failed:", e)
+	fmt.Fprintln(os.Stderr, "\n", "[ERR]", "NAF procedure failed:", e)
 	return common.MeAns{
 		Code: code,
 		Body: []byte(e.Error()),
@@ -57,29 +55,49 @@ func errorResult(code int, e error) common.MeAns {
 }
 
 func gbaClientHandler(r common.MeReq) common.MeAns {
-	fmt.Println()
-	fmt.Println("[INFO]", "starting new HTTP request:", r.Method, r.RequestURI)
+	fmt.Println("\n", "[INFO]", "starting new HTTP request:", r.Method, r.RequestURI)
 
-	dbr := common.DbReq{IMPI: r.IMPI}
-	e := enc.Encode(dbr)
-	if e != nil {
-		fmt.Fprintln(os.Stderr, "[ERR]", "faild to encode DB request:", e)
-		return errorResult(http.StatusInternalServerError, e)
-	}
-	av := bag.AV{}
-	e = dec.Decode(&av)
-	if e != nil {
-		fmt.Fprintln(os.Stderr, "[ERR]", "faild to decode DB answer:", e)
-		return errorResult(http.StatusInternalServerError, e)
-	}
-	fmt.Println()
-	fmt.Println("[INFO]", "retrieved AV info")
+	query := common.DBQuery{
+		IMPI: r.IMPI,
+		Ch:   make(chan bag.AV, 1)}
+	common.Queue <- query
+	av := <-query.Ch
+	av.IMPI = r.IMPI
+
+	fmt.Println("\n", "[INFO]", "retrieved AV info")
 	fmt.Printf("  | RAND     = %x\n", av.RAND)
 	fmt.Printf("  | AUTN     = %x\n", av.AUTN)
 	fmt.Printf("  | RES      = %x\n", av.RES)
 	fmt.Printf("  | IK       = %x\n", av.IK)
 	fmt.Printf("  | CK       = %x\n", av.CK)
 	fmt.Printf("  | IMPI     = %s\n", av.IMPI)
+
+	if len(r.RAND) != 0 {
+		av.RAND = r.RAND
+		fmt.Printf("[INFO] override AV RAND to %x\n", av.RAND)
+	}
+	if len(r.AUTN) != 0 {
+		av.AUTN = r.AUTN
+		fmt.Printf("[INFO] override AV AUTN to %x\n", av.AUTN)
+	}
+	if len(r.RES) != 0 {
+		av.RES = r.RES
+		fmt.Printf("[INFO] override AV RES to %x\n", av.RES)
+	}
+	if len(r.IK) != 0 {
+		av.IK = r.IK
+		fmt.Printf("[INFO] override AV IK to %x\n", av.IK)
+	}
+	if len(r.CK) != 0 {
+		av.CK = r.CK
+		fmt.Printf("[INFO] override AV CK to %x\n", av.CK)
+	}
+
+	if r.ClearCache {
+		fmt.Println("[INFO]", "cache of Authenticate and B-TID is cleared")
+		delete(nafAuthMap, r.IMPI)
+		delete(btidMap, r.IMPI)
+	}
 
 	var nc uint64 = 0
 	var cipher uint32 = 2
@@ -112,7 +130,7 @@ func gbaClientHandler(r common.MeReq) common.MeAns {
 
 			ksnaf := base64.StdEncoding.EncodeToString(bag.KeyDerivation(
 				av.CK, av.IK, av.RAND, av.IMPI, req.Host, 1, cipher))
-			fmt.Println("[INFO]", "Ks_naf", ksnaf, "is generated from")
+			fmt.Println("\n", "[INFO]", "Ks_naf", ksnaf, "is generated from")
 			fmt.Printf("  | CK       = %x\n", av.CK)
 			fmt.Printf("  | IK       = %x\n", av.IK)
 			fmt.Printf("  | RAND     = %x\n", av.RAND)
@@ -129,16 +147,13 @@ func gbaClientHandler(r common.MeReq) common.MeAns {
 			req.Header.Set("X-3GPP-Intended-Identity", r.IMPU)
 		}
 
-		fmt.Println()
-		fmt.Println("[INFO]", "transfer request to NAF", req.Host)
+		fmt.Println("\n", "[INFO]", "transfer request to NAF", req.Host)
 		fmt.Println("  >", req.Method, req.URL, req.Proto)
 		fmt.Println("  >", "Host :", req.Host)
-		for k, v := range req.Header {
-			fmt.Println("  >", k, ":", strings.Join(v, ", "))
-		}
+		logHeader(req.Header, "  >")
+
 		if len(r.Body) != 0 {
-			fmt.Println()
-			fmt.Println("  >", string(r.Body))
+			fmt.Println("\n", "  >", string(r.Body))
 		}
 
 		res, e := client.Do(req)
@@ -146,8 +161,7 @@ func gbaClientHandler(r common.MeReq) common.MeAns {
 			return errorResult(http.StatusBadGateway,
 				fmt.Errorf("failed to access NAF: %s", e))
 		}
-		fmt.Println()
-		fmt.Println("[INFO]", "response from NAF", req.Host)
+		fmt.Println("\n", "[INFO]", "response from NAF", req.Host)
 		if res.TLS == nil {
 			fmt.Println("[INFO]", "connection is not TLS")
 		} else {
@@ -156,9 +170,7 @@ func gbaClientHandler(r common.MeReq) common.MeAns {
 			cipher = 0x0100 | uint32(res.TLS.CipherSuite)
 		}
 		fmt.Println("  <", res.Proto, res.Status)
-		for k, v := range res.Header {
-			fmt.Println("  <", k, ":", strings.Join(v, ", "))
-		}
+		logHeader(res.Header, "  <")
 
 		if res.StatusCode != http.StatusUnauthorized {
 			authInfo, e := bag.ParseaAuthenticationInfo(
@@ -167,8 +179,7 @@ func gbaClientHandler(r common.MeReq) common.MeAns {
 				nafAuth.Nonce = authInfo.Nextnonce
 				nafAuthMap[r.IMPI] = nafAuth
 			} else {
-				fmt.Println()
-				fmt.Fprintln(os.Stderr, "[ERR]",
+				fmt.Fprintln(os.Stderr, "\n", "[ERR]",
 					"NAF returns invalid Authentication-Info header:", e)
 			}
 
@@ -193,22 +204,18 @@ func gbaClientHandler(r common.MeReq) common.MeAns {
 				fmt.Errorf("invalid WWW-Authenticate header from NAF: %s", e))
 		}
 		nafAuthMap[r.IMPI] = nafAuth
-		fmt.Println()
-		fmt.Println("[INFO]", "NAF Authenticate data is cached, entry =", len(nafAuthMap))
+		fmt.Println("\n", "[INFO]", "NAF Authenticate data is cached, entry =", len(nafAuthMap))
 
-		fmt.Println()
-		fmt.Println("[INFO]", "BSF authentication is required")
+		fmt.Println("\n", "[INFO]", "BSF authentication is required")
 		btid, e = bootstrap(av)
 		if e != nil {
 			return errorResult(http.StatusForbidden,
 				fmt.Errorf("bootstrap to BFS failed: %s", e))
 		}
 		btidMap[r.IMPI] = btid
-		fmt.Println()
-		fmt.Println("[INFO]", "B-TID is cached, entry =", len(btidMap))
+		fmt.Println("\n", "[INFO]", "B-TID is cached, entry =", len(btidMap))
 
-		fmt.Println()
-		fmt.Println("[INFO]", "BSF authentication success, retrying NAF access")
+		fmt.Println("\n", "[INFO]", "BSF authentication success, retrying NAF access")
 	}
 
 	return errorResult(http.StatusForbidden,

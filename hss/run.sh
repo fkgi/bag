@@ -1,1 +1,1 @@
-./hss -l sctp://hss.epc.mnc99.mcc999.3gppnetwork.org -p sctp://dra1.epc.mnc99.mcc999.3gppnetwork.org &
+./hss -diameter-local sctp://hss.epc.mnc99.mcc999.3gppnetwork.org -diameter-peer sctp://dra1.epc.mnc99.mcc999.3gppnetwork.org &

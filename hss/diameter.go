@@ -50,7 +50,6 @@ func marHandler(retry bool, avps []diameter.AVP) (bool, []diameter.AVP) {
 
 	result := diameter.Success
 	auth := diameter.AVP{}
-	av := bag.AV{}
 
 	if iavp, ok := e.(diameter.InvalidAVP); ok {
 		result = iavp.Code
@@ -60,17 +59,18 @@ func marHandler(retry bool, avps []diameter.AVP) (bool, []diameter.AVP) {
 	} else if len(session) == 0 {
 		result = diameter.MissingAvp
 		e = diameter.InvalidAVP{Code: result, AVP: diameter.SetSessionID("")}
-	} else if e = enc.Encode(common.DbReq{IMPI: impi}); e != nil {
-		log.Println("[ERR]", "faild to access to DB RPC:", e)
-		result = diameter.UnableToComply
-	} else if e = dec.Decode(&av); e != nil {
-		log.Println("[ERR]", "faild to access to DB RPC:", e)
-		result = diameter.UnableToComply
-	} else if len(av.RAND) == 0 {
-		result = bag.IdentityUnknown
-		e = errors.New("identity not found")
 	} else {
-		auth = bag.SetSIPAuthDataItem(av.RAND, av.AUTN, nil, av.RES, av.CK, av.IK)
+		query := common.DBQuery{
+			IMPI: impi,
+			Ch:   make(chan bag.AV, 1)}
+		common.Queue <- query
+		av := <-query.Ch
+		if len(av.RAND) == 0 {
+			result = bag.IdentityUnknown
+			e = errors.New("identity not found")
+		} else {
+			auth = bag.SetSIPAuthDataItem(av.RAND, av.AUTN, nil, av.RES, av.CK, av.IK)
+		}
 	}
 
 	res := []diameter.AVP{}

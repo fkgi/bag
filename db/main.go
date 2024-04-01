@@ -12,14 +12,13 @@ import (
 	"strings"
 
 	"github.com/fkgi/bag"
-	"github.com/fkgi/bag/common"
 )
 
 var avs = map[string]bag.AV{}
 
 func main() {
-	hport := flag.String("a", ":8080", "HTTP API local port with format [host]:port")
-	cport := flag.String("s", ":6636", "DB RPC local port with format [host]:port")
+	hport := flag.String("api-port", ":8080", "HTTP API local port with format [host]:port")
+	cport := flag.String("rpc-port", ":6636", "DB RPC local port with format [host]:port")
 	flag.Parse()
 
 	log.Println("[INFO]", "starting authentication vector DB")
@@ -27,7 +26,7 @@ func main() {
 	log.Println("[INFO]", "listening DB RPC on", *cport)
 	l, e := net.Listen("tcp", *cport)
 	if e != nil {
-		log.Fatalln("[ERR]", "failed to listen RPC connection:", e)
+		log.Fatalln("[ERR]", "failed to listen DB RPC:", e)
 	}
 	defer l.Close()
 	go func(l net.Listener) {
@@ -35,38 +34,35 @@ func main() {
 		for ; e == nil; c, e = l.Accept() {
 			go rpcHandler(c)
 		}
-		log.Fatalln("[ERR]", "failed to accept RPC connection:", e)
+		log.Fatalln("[ERR]", "failed to accept DB RPC:", e)
 	}(l)
 
 	log.Println("[INFO]", "listening HTTP request on", *hport)
-	log.Fatalln("[ERR]", "failed to serve HTTP session:",
+	log.Fatalln("[ERR]", "failed to serve HTTP:",
 		http.ListenAndServe(*hport, http.HandlerFunc(apiHandler)))
 }
 
 func rpcHandler(c net.Conn) {
-	log.Println("[INFO]", "new RPC connection from", c.RemoteAddr())
-	defer c.Close()
-
+	log.Println("[INFO]", "new DB RPC connection from", c.RemoteAddr())
 	dec := gob.NewDecoder(c)
 	enc := gob.NewEncoder(c)
 
 	for {
-		r := common.DbReq{}
-		e := dec.Decode(&r)
-		if e == io.EOF {
+		r := ""
+		if e := dec.Decode(&r); e == io.EOF {
 			break
-		}
-		if e != nil {
+		} else if e != nil {
 			log.Println("[ERR]", "RPC request decoding failed:", e)
 			break
 		}
 
-		e = enc.Encode(avs[r.IMPI])
-		if e != nil {
+		if e := enc.Encode(avs[r]); e != nil {
 			log.Println("[ERR]", "RPC answer encoding failed:", e)
 			break
 		}
 	}
+
+	c.Close()
 	log.Println("[INFO]", "RPC connection from", c.RemoteAddr(), "closed")
 }
 

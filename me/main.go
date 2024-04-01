@@ -2,7 +2,6 @@ package main
 
 import (
 	"crypto/tls"
-	"encoding/gob"
 	"flag"
 	"fmt"
 	"net"
@@ -13,6 +12,8 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/fkgi/bag/common"
 )
 
 var (
@@ -22,18 +23,17 @@ var (
 	expire         = time.Second * 3
 
 	client *http.Client
-
-	dec *gob.Decoder
-	enc *gob.Encoder
 )
 
 const uaPrefix = ""
 
 func main() {
-	flag.StringVar(&bsf, "b", bsf, "HTTP URL of BSF")
-	db := flag.String("d", "localhost:6636", "DB RPC remote host:port")
-	local := flag.String("l", os.TempDir()+string(os.PathSeparator)+"me.sock", "ctrl RPC local UNIX socket path")
-	secrets := flag.String("s", "", "TLS secrets file for capture")
+	fmt.Println("[INFO]", "starting GBA_ME tester")
+
+	flag.StringVar(&bsf, "bsf", bsf, "HTTP URL of BSF")
+	db := flag.String("db", "localhost:6636", "DB RPC remote host:port")
+	local := flag.String("ctrl", os.TempDir()+string(os.PathSeparator)+"me.sock", "ctrl RPC local UNIX socket path")
+	secrets := flag.String("secrets", "", "TLS secrets file for capture")
 
 	ciphers := ""
 	allCiphers := map[string]*tls.CipherSuite{}
@@ -42,7 +42,7 @@ func main() {
 		ciphers += "," + c.Name
 	}
 	ciphers = ciphers[1:]
-	flag.StringVar(&ciphers, "c", ciphers, "ciphers for TLS")
+	flag.StringVar(&ciphers, "ciphers", ciphers, "comma separated names of ciphers for TLS")
 
 	flag.Parse()
 
@@ -78,19 +78,21 @@ func main() {
 	t.TLSNextProto = map[string]func(string, *tls.Conn) http.RoundTripper{}
 	client = &http.Client{Timeout: expire, Transport: t}
 
-	fmt.Println("[INFO]", "connecting to DB RPC", *db)
-	c, e := net.Dial("tcp", *db)
-	if e != nil {
-		fmt.Fprintln(os.Stderr, "[ERR]", "faild to connect to DB:", e)
-		os.Exit(1)
+	common.Log = func(a ...any) {
+		if len(a) == 0 {
+			fmt.Println()
+		} else if a[0] == "[ERR]" {
+			fmt.Fprintln(os.Stderr, a...)
+		} else if a[0] == "[INFO]" {
+			fmt.Println(a...)
+		}
 	}
-	dec = gob.NewDecoder(c)
-	enc = gob.NewEncoder(c)
+	go common.ConnectDB(*db)
 
-	fmt.Println("[INFO]", "listening GOB request on", *local)
+	fmt.Println("[INFO]", "listening ctrl RPC request on", *local)
 	l, e := net.Listen("unix", *local)
 	if e != nil {
-		fmt.Fprintln(os.Stderr, "[ERR]", "failed to listen GOB session:", e)
+		fmt.Fprintln(os.Stderr, "[ERR]", "failed to listen ctrl RPC session:", e)
 		os.Exit(1)
 	}
 
@@ -98,7 +100,7 @@ func main() {
 	signal.Notify(sigc, os.Interrupt, syscall.SIGTERM)
 	go func(l net.Listener, c chan os.Signal) {
 		sig := <-c
-		fmt.Println("[INFO]", "caught signal", sig.String(), "shutting down")
+		fmt.Println("\n", "[INFO]", "caught signal", sig.String(), "shutting down")
 		l.Close()
 		os.Exit(0)
 	}(l, sigc)
@@ -106,7 +108,7 @@ func main() {
 	for {
 		c, e := l.Accept()
 		if e != nil {
-			fmt.Fprintln(os.Stderr, "[ERR]", "failed to accept GOB session:", e)
+			fmt.Fprintln(os.Stderr, "[ERR]", "failed to accept ctrl RPC session:", e)
 			l.Close()
 			os.Exit(1)
 		}
