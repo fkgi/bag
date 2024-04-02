@@ -60,11 +60,7 @@ func marHandler(retry bool, avps []diameter.AVP) (bool, []diameter.AVP) {
 		result = diameter.MissingAvp
 		e = diameter.InvalidAVP{Code: result, AVP: diameter.SetSessionID("")}
 	} else {
-		query := common.DBQuery{
-			IMPI: impi,
-			Ch:   make(chan bag.AV, 1)}
-		common.Queue <- query
-		av := <-query.Ch
+		av := common.QueryDB(impi)
 		if len(av.RAND) == 0 {
 			result = bag.IdentityUnknown
 			e = errors.New("identity not found")

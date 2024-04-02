@@ -14,7 +14,7 @@ import (
 	"github.com/fkgi/bag"
 )
 
-func bootstrap(av bag.AV) (string, error) {
+func bootstrap(av bag.AV, client *http.Client) (string, error) {
 	bsfAuth := bag.WWWAuthenticate{}
 
 	for i := 0; i < authRetransmit; i++ {
@@ -63,9 +63,9 @@ func bootstrap(av bag.AV) (string, error) {
 		}
 		fmt.Println("\n", "[INFO]", "response from BSF", req.Host)
 		if res.TLS == nil {
-			fmt.Println("[INFO]", "connection is not TLS")
+			fmt.Println("", "[INFO]", "connection is not TLS")
 		} else {
-			fmt.Println("[INFO]", "connection is TLS with cipher",
+			fmt.Println("", "[INFO]", "connection is TLS with cipher",
 				tls.CipherSuiteName(res.TLS.CipherSuite))
 		}
 		fmt.Println("  <", res.Proto, res.Status)

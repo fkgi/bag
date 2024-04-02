@@ -8,16 +8,24 @@ import (
 	"github.com/fkgi/bag"
 )
 
-type DBQuery struct {
-	IMPI string
-	Ch   chan bag.AV
+type query struct {
+	impi string
+	ch   chan bag.AV
 }
 
 var (
-	Queue    = make(chan DBQuery, 1024)
+	queue    = make(chan query, 1024)
 	Log      = func(...any) {}
 	interval = time.Second
 )
+
+func QueryDB(impi string) bag.AV {
+	q := query{
+		impi: impi,
+		ch:   make(chan bag.AV, 1)}
+	queue <- q
+	return <-q.ch
+}
 
 func ConnectDB(path string) {
 	for {
@@ -34,32 +42,32 @@ func ConnectDB(path string) {
 		dec := gob.NewDecoder(c)
 		enc := gob.NewEncoder(c)
 		ticker := time.NewTicker(interval)
-		var query DBQuery
+		var q query
 		var av bag.AV
 
 		for {
 
 			select {
-			case query = <-Queue:
+			case q = <-queue:
 			case <-ticker.C:
-				query.IMPI = ""
-				query.Ch = make(chan bag.AV, 1)
+				q.impi = ""
+				q.ch = make(chan bag.AV, 1)
 			}
 
-			if e = enc.Encode(query.IMPI); e != nil {
+			if e = enc.Encode(q.impi); e != nil {
 				Log()
 				Log("[ERR]", "read from DB RPC failed:", e)
-				query.Ch <- bag.AV{}
+				q.ch <- bag.AV{}
 				break
 			}
 			if e = dec.Decode(&av); e != nil {
 				Log()
 				Log("[ERR]", "write to DB RPC failed:", e)
-				query.Ch <- bag.AV{}
+				q.ch <- bag.AV{}
 				break
 			}
 
-			query.Ch <- av
+			q.ch <- av
 		}
 		ticker.Stop()
 		c.Close()

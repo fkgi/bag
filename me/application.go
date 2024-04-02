@@ -10,15 +10,24 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 
 	"github.com/fkgi/bag"
 	"github.com/fkgi/bag/common"
 )
 
+type clientInfo struct {
+	auth   bag.WWWAuthenticate
+	btid   string
+	client *http.Client
+	cipher uint32
+}
+
 var (
-	nafAuthMap = map[string]bag.WWWAuthenticate{}
-	btidMap    = map[string]string{}
+	clientMap = map[string]clientInfo{}
+	// nafAuthMap = map[string]bag.WWWAuthenticate{}
+	// btidMap    = map[string]string{}
 )
 
 func gbaClientSession(c net.Conn) {
@@ -34,13 +43,13 @@ func gbaClientSession(c net.Conn) {
 			break
 		}
 		if e != nil {
-			fmt.Fprintln(os.Stderr, "[ERR]", "GOB request encoding failed:", e)
+			fmt.Fprintln(os.Stderr, "", "[ERR]", "ctrl RPC request encode failed:", e)
 			break
 		}
 
 		e = enc.Encode(gbaClientHandler(r))
 		if e != nil {
-			fmt.Fprintln(os.Stderr, "[ERR]", "GOB answer decoding failed:", e)
+			fmt.Fprintln(os.Stderr, "", "[ERR]", "ctrl GOB answer decode failed:", e)
 			return
 		}
 	}
@@ -57,11 +66,7 @@ func errorResult(code int, e error) common.MeAns {
 func gbaClientHandler(r common.MeReq) common.MeAns {
 	fmt.Println("\n", "[INFO]", "starting new HTTP request:", r.Method, r.RequestURI)
 
-	query := common.DBQuery{
-		IMPI: r.IMPI,
-		Ch:   make(chan bag.AV, 1)}
-	common.Queue <- query
-	av := <-query.Ch
+	av := common.QueryDB(r.IMPI)
 	av.IMPI = r.IMPI
 
 	fmt.Println("\n", "[INFO]", "retrieved AV info")
@@ -74,62 +79,69 @@ func gbaClientHandler(r common.MeReq) common.MeAns {
 
 	if len(r.RAND) != 0 {
 		av.RAND = r.RAND
-		fmt.Printf("[INFO] override AV RAND to %x\n", av.RAND)
+		fmt.Printf(" [INFO] override AV RAND to %x\n", av.RAND)
 	}
 	if len(r.AUTN) != 0 {
 		av.AUTN = r.AUTN
-		fmt.Printf("[INFO] override AV AUTN to %x\n", av.AUTN)
+		fmt.Printf(" [INFO] override AV AUTN to %x\n", av.AUTN)
 	}
 	if len(r.RES) != 0 {
 		av.RES = r.RES
-		fmt.Printf("[INFO] override AV RES to %x\n", av.RES)
+		fmt.Printf(" [INFO] override AV RES to %x\n", av.RES)
 	}
 	if len(r.IK) != 0 {
 		av.IK = r.IK
-		fmt.Printf("[INFO] override AV IK to %x\n", av.IK)
+		fmt.Printf(" [INFO] override AV IK to %x\n", av.IK)
 	}
 	if len(r.CK) != 0 {
 		av.CK = r.CK
-		fmt.Printf("[INFO] override AV CK to %x\n", av.CK)
+		fmt.Printf(" [INFO] override AV CK to %x\n", av.CK)
 	}
 
+	u, _ := url.ParseRequestURI(r.RequestURI)
+	infoKey := u.Scheme + "://" + u.Host + "/" + r.IMPI
+
 	if r.ClearCache {
-		fmt.Println("[INFO]", "cache of Authenticate and B-TID is cleared")
-		delete(nafAuthMap, r.IMPI)
-		delete(btidMap, r.IMPI)
+		fmt.Println(" [INFO]", "cache of Authenticate and B-TID is cleared")
+		delete(clientMap, infoKey)
+	}
+	info, ok := clientMap[infoKey]
+	if !ok {
+		info.client = &http.Client{Timeout: expire, Transport: transport.Clone()}
+		info.cipher = 2
 	}
 
 	var nc uint64 = 0
-	var cipher uint32 = 2
+	// var cipher uint32 = 2
 
 	for i := 0; i < authRetransmit; i++ {
-		nafAuth := nafAuthMap[r.IMPI]
-		btid := btidMap[r.IMPI]
+		// nafAuth := nafAuthMap[r.IMPI]
+		// btid := btidMap[r.IMPI]
 
 		req, _ := http.NewRequest(r.Method, r.RequestURI, bytes.NewReader(r.Body))
 
-		if btid != "" && nafAuth.Nonce != "" {
+		if info.btid != "" && info.auth.Nonce != "" {
 			nc++
 			auth := bag.Authorization{
-				Username: btid,
-				Realm:    nafAuth.Realm,
+				Username: info.btid,
+				Realm:    info.auth.Realm,
 				Uri:      req.URL.Path,
-				Nonce:    nafAuth.Nonce,
+				Nonce:    info.auth.Nonce,
 				Nc:       nc,
 				Cnonce:   bag.NewRandText(),
-				Opaque:   nafAuth.Opaque}
+				Opaque:   info.auth.Opaque}
 			if auth.Uri == "" {
 				auth.Uri = "/"
 			}
 			auth.Qop = "auth"
-			for _, v := range nafAuth.Qop {
+			for _, v := range info.auth.Qop {
 				if v == "auth-int" {
 					auth.Qop = "auth-int"
 				}
 			}
 
 			ksnaf := base64.StdEncoding.EncodeToString(bag.KeyDerivation(
-				av.CK, av.IK, av.RAND, av.IMPI, req.Host, 1, cipher))
+				av.CK, av.IK, av.RAND, av.IMPI, req.Host, 1, info.cipher))
 			fmt.Println("\n", "[INFO]", "Ks_naf", ksnaf, "is generated from")
 			fmt.Printf("  | CK       = %x\n", av.CK)
 			fmt.Printf("  | IK       = %x\n", av.IK)
@@ -137,7 +149,7 @@ func gbaClientHandler(r common.MeReq) common.MeAns {
 			fmt.Printf("  | IMPI     = %s\n", av.IMPI)
 			fmt.Printf("  | NAF host = %s\n", req.Host)
 			fmt.Printf("  | vendor   = 1\n")
-			fmt.Printf("  | protocol = %x\n", cipher)
+			fmt.Printf("  | protocol = %x\n", info.cipher)
 
 			auth.SetResponse(req.Method, []byte(ksnaf), r.Body)
 			req.Header.Set("Authorization", auth.String())
@@ -156,18 +168,18 @@ func gbaClientHandler(r common.MeReq) common.MeAns {
 			fmt.Println("\n", "  >", string(r.Body))
 		}
 
-		res, e := client.Do(req)
+		res, e := info.client.Do(req)
 		if e != nil {
 			return errorResult(http.StatusBadGateway,
 				fmt.Errorf("failed to access NAF: %s", e))
 		}
 		fmt.Println("\n", "[INFO]", "response from NAF", req.Host)
 		if res.TLS == nil {
-			fmt.Println("[INFO]", "connection is not TLS")
+			fmt.Println("", "[INFO]", "connection is not TLS")
 		} else {
-			fmt.Println("[INFO]", "connection is TLS with cipher",
+			fmt.Println("", "[INFO]", "connection is TLS with cipher",
 				tls.CipherSuiteName(res.TLS.CipherSuite))
-			cipher = 0x0100 | uint32(res.TLS.CipherSuite)
+			info.cipher = 0x0100 | uint32(res.TLS.CipherSuite)
 		}
 		fmt.Println("  <", res.Proto, res.Status)
 		logHeader(res.Header, "  <")
@@ -176,8 +188,8 @@ func gbaClientHandler(r common.MeReq) common.MeAns {
 			authInfo, e := bag.ParseaAuthenticationInfo(
 				res.Header.Get("Authentication-Info"))
 			if e == nil {
-				nafAuth.Nonce = authInfo.Nextnonce
-				nafAuthMap[r.IMPI] = nafAuth
+				info.auth.Nonce = authInfo.Nextnonce
+				clientMap[infoKey] = info
 			} else {
 				fmt.Fprintln(os.Stderr, "\n", "[ERR]",
 					"NAF returns invalid Authentication-Info header:", e)
@@ -188,7 +200,7 @@ func gbaClientHandler(r common.MeReq) common.MeAns {
 			}
 			ans.Body, e = io.ReadAll(res.Body)
 			if e != nil {
-				fmt.Println("[ERR]", e)
+				fmt.Println("", "[ERR]", e)
 			}
 			defer res.Body.Close()
 			if len(ans.Body) != 0 {
@@ -198,22 +210,22 @@ func gbaClientHandler(r common.MeReq) common.MeAns {
 			return ans
 		}
 
-		nafAuth, e = bag.ParseaWWWAuthenticate(res.Header.Get("WWW-Authenticate"))
+		info.auth, e = bag.ParseaWWWAuthenticate(res.Header.Get("WWW-Authenticate"))
 		if e != nil {
 			return errorResult(http.StatusBadGateway,
 				fmt.Errorf("invalid WWW-Authenticate header from NAF: %s", e))
 		}
-		nafAuthMap[r.IMPI] = nafAuth
-		fmt.Println("\n", "[INFO]", "NAF Authenticate data is cached, entry =", len(nafAuthMap))
+		clientMap[infoKey] = info
+		fmt.Println("\n", "[INFO]", "NAF Authenticate data is cached, entry =", len(clientMap))
 
 		fmt.Println("\n", "[INFO]", "BSF authentication is required")
-		btid, e = bootstrap(av)
+		info.btid, e = bootstrap(av, info.client)
 		if e != nil {
 			return errorResult(http.StatusForbidden,
 				fmt.Errorf("bootstrap to BFS failed: %s", e))
 		}
-		btidMap[r.IMPI] = btid
-		fmt.Println("\n", "[INFO]", "B-TID is cached, entry =", len(btidMap))
+		clientMap[infoKey] = info
+		fmt.Println("\n", "[INFO]", "B-TID is cached, entry =", len(clientMap))
 
 		fmt.Println("\n", "[INFO]", "BSF authentication success, retrying NAF access")
 	}
