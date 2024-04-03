@@ -22,6 +22,7 @@ var (
 	authRetransmit = 3
 	transport      *http.Transport
 	expire         time.Duration
+	verbose        *bool
 )
 
 const uaPrefix = ""
@@ -30,8 +31,10 @@ func main() {
 	fmt.Println("", "[INFO]", "starting GBA_ME tester")
 
 	flag.StringVar(&bsf, "bsf", bsf, "HTTP URL of BSF")
-	db := flag.String("db", "localhost:6636", "DB RPC remote host:port")
-	local := flag.String("ctrl", os.TempDir()+string(os.PathSeparator)+"me.sock", "ctrl RPC local UNIX socket path")
+	db := flag.String("db", "localhost:6636", "DB RPC remote TCP host:port")
+	local := flag.String("ctrl",
+		os.TempDir()+string(os.PathSeparator)+"me.sock",
+		"ctrl RPC local UNIX socket path")
 	secrets := flag.String("secrets", "", "TLS secrets file for capture")
 	flag.DurationVar(&expire, "expire", time.Second*3, "expireation time for HTTP client access")
 
@@ -43,6 +46,8 @@ func main() {
 	}
 	ciphers = ciphers[1:]
 	flag.StringVar(&ciphers, "ciphers", ciphers, "comma separated names of ciphers for TLS")
+
+	verbose = flag.Bool("verbose", false, "verbose log mode")
 
 	flag.Parse()
 

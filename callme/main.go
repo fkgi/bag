@@ -16,7 +16,7 @@ import (
 
 func main() {
 	local := os.TempDir() + string(os.PathSeparator) + "me.sock"
-	flag.StringVar(&local, "rpc-sock", local, "UNIX socket path to me")
+	flag.StringVar(&local, "rpc-sock", local, "ctrl RPC remote UNIX socket path")
 
 	r := common.MeReq{Method: "GET"}
 	flag.StringVar(&r.Method, "method", r.Method, "HTTP request method")
@@ -92,22 +92,16 @@ func main() {
 	}
 	defer c.Close()
 
-	dec := gob.NewDecoder(c)
-	enc := gob.NewEncoder(c)
-
-	e = enc.Encode(r)
-	if e != nil {
+	if e = gob.NewEncoder(c).Encode(r); e != nil {
 		fmt.Fprintln(os.Stderr, "write to ctrl RPC failed:", e)
 		os.Exit(1)
 	}
 
 	a := common.MeAns{}
-	e = dec.Decode(&a)
-	if e != nil {
+	if e = gob.NewDecoder(c).Decode(&a); e != nil {
 		fmt.Fprintln(os.Stderr, "read from ctrl RPC failed:", e)
 		os.Exit(1)
 	}
-
 	fmt.Println(a.Code, http.StatusText(a.Code))
 	fmt.Println(string(a.Body))
 }

@@ -52,24 +52,29 @@ func bootstrap(av bag.AV, client *http.Client) (string, error) {
 		req.Header.Set("User-Agent", uaPrefix+"3gpp-gba")
 		req.Header.Set("Accept", "*/*")
 
-		fmt.Println("\n", "[INFO]", "bootstrapping to", req.Host)
-		fmt.Println("  >", req.Method, req.URL, req.Proto)
-		fmt.Println("  >", "Host :", req.Host)
-		logHeader(req.Header, "  >")
+		if *verbose {
+			fmt.Println("\n", "[INFO]", "bootstrapping to", req.Host)
+			fmt.Println("  >", req.Method, req.URL, req.Proto)
+			fmt.Println("  >", "Host :", req.Host)
+			logHeader(req.Header, "  >")
+		}
 
 		res, e := client.Do(req)
 		if e != nil {
 			return "", fmt.Errorf("failed to access BSF: %s", e)
 		}
-		fmt.Println("\n", "[INFO]", "response from BSF", req.Host)
-		if res.TLS == nil {
-			fmt.Println("", "[INFO]", "connection is not TLS")
-		} else {
-			fmt.Println("", "[INFO]", "connection is TLS with cipher",
-				tls.CipherSuiteName(res.TLS.CipherSuite))
+		if *verbose {
+			fmt.Println("\n", "[INFO]", "response from BSF", req.Host)
+
+			if res.TLS == nil {
+				fmt.Println("", "[INFO]", "connection is not TLS")
+			} else {
+				fmt.Println("", "[INFO]", "connection is TLS with cipher",
+					tls.CipherSuiteName(res.TLS.CipherSuite))
+			}
+			fmt.Println("  <", res.Proto, res.Status)
+			logHeader(res.Header, "  <")
 		}
-		fmt.Println("  <", res.Proto, res.Status)
-		logHeader(res.Header, "  <")
 
 		switch res.StatusCode {
 		case http.StatusUnauthorized:
@@ -86,9 +91,11 @@ func bootstrap(av bag.AV, client *http.Client) (string, error) {
 					"data size is not 16+16 octets")
 			}
 
-			fmt.Println("\n", "[INFO]", "AKA authentication is required")
-			fmt.Printf("  | RAND = %x\n", d[:16])
-			fmt.Printf("  | AUTN = %x\n", d[16:])
+			if *verbose {
+				fmt.Println("\n", "[INFO]", "AKA authentication is required")
+				fmt.Printf("  | RAND = %x\n", d[:16])
+				fmt.Printf("  | AUTN = %x\n", d[16:])
+			}
 		case http.StatusOK:
 			/*
 				authInfo, e := bag.ParseaAuthenticationInfo(
@@ -102,7 +109,7 @@ func bootstrap(av bag.AV, client *http.Client) (string, error) {
 
 			data, _ := io.ReadAll(res.Body)
 			defer res.Body.Close()
-			if len(data) != 0 {
+			if len(data) != 0 && *verbose {
 				fmt.Println("  <")
 				fmt.Println("  <", string(data))
 			}
@@ -117,7 +124,9 @@ func bootstrap(av bag.AV, client *http.Client) (string, error) {
 		default:
 			return "", errors.New("unexpected BSF response " + res.Status)
 		}
-		fmt.Println("\n", "[INFO]", "retrying BSF access")
+		if *verbose {
+			fmt.Println("\n", "[INFO]", "retrying BSF access")
+		}
 	}
 
 	return "", errors.New("bootstraping authentication retry count exceeded")

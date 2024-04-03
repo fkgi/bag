@@ -42,10 +42,10 @@ func ConnectDB(path string) {
 		dec := gob.NewDecoder(c)
 		enc := gob.NewEncoder(c)
 		ticker := time.NewTicker(interval)
-		var q query
-		var av bag.AV
 
 		for {
+			var q query
+			var av bag.AV
 
 			select {
 			case q = <-queue:

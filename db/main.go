@@ -14,7 +14,11 @@ import (
 	"github.com/fkgi/bag"
 )
 
-var avs = map[string]bag.AV{}
+var avs = make(chan (map[string]bag.AV), 1)
+
+func init() {
+	avs <- map[string]bag.AV{}
+}
 
 func main() {
 	hport := flag.String("api-port", ":8080", "HTTP API local port with format [host]:port")
@@ -56,7 +60,10 @@ func rpcHandler(c net.Conn) {
 			break
 		}
 
-		if e := enc.Encode(avs[r]); e != nil {
+		av := <-avs
+		e := enc.Encode(av[r])
+		avs <- av
+		if e != nil {
 			log.Println("[ERR]", "RPC answer encoding failed:", e)
 			break
 		}
@@ -70,7 +77,10 @@ func apiHandler(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path == "" || r.URL.Path == "/" {
 		switch r.Method {
 		case http.MethodGet:
-			if data, e := json.Marshal(avs); e != nil {
+			avm := <-avs
+			data, e := json.Marshal(avm)
+			avs <- avm
+			if e != nil {
 				w.WriteHeader(http.StatusInternalServerError)
 				w.Write([]byte(e.Error()))
 				log.Println("[ERR]", "prov fail:", "failed to marshal data list:", e)
@@ -94,7 +104,10 @@ func apiHandler(w http.ResponseWriter, r *http.Request) {
 
 	switch r.Method {
 	case http.MethodGet:
-		if av, ok := avs[p[1]]; !ok {
+		avm := <-avs
+		av, ok := avm[p[1]]
+		avs <- avm
+		if !ok {
 			w.WriteHeader(http.StatusNotFound)
 			w.Write([]byte("unknown IMPI: " + p[1]))
 		} else if data, e := json.Marshal(av); e != nil {
@@ -139,7 +152,9 @@ func apiHandler(w http.ResponseWriter, r *http.Request) {
 				av.CK = make([]byte, 16)
 				rand.Read(av.CK)
 			}
-			avs[p[1]] = av
+			avm := <-avs
+			avm[p[1]] = av
+			avs <- avm
 
 			w.Header().Add("content-type", "application/json")
 			w.WriteHeader(http.StatusOK)
@@ -148,13 +163,15 @@ func apiHandler(w http.ResponseWriter, r *http.Request) {
 		r.Body.Close()
 
 	case http.MethodDelete:
-		if _, ok := avs[p[1]]; !ok {
+		avm := <-avs
+		if _, ok := avm[p[1]]; !ok {
 			w.WriteHeader(http.StatusNotFound)
 			w.Write([]byte("unknown IMPI: " + p[1]))
 		} else {
-			delete(avs, p[1])
+			delete(avm, p[1])
 			w.WriteHeader(http.StatusNoContent)
 		}
+		avs <- avm
 
 	default:
 		w.WriteHeader(http.StatusMethodNotAllowed)

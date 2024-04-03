@@ -18,3 +18,5 @@ echo ${ST}
 date "+%H:%M:%S.%3N"
 
 exit 0
+
+# ./callme -uri http://naf.mnc99.mcc999.3gppnetwork.org/path -impi 999991122220001@ims.mnc99.mcc999.3gppnetwork.org -impu sip:+9991122220001@ims.mnc99.mcc999.3gppnetwork.org

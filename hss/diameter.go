@@ -59,14 +59,11 @@ func marHandler(retry bool, avps []diameter.AVP) (bool, []diameter.AVP) {
 	} else if len(session) == 0 {
 		result = diameter.MissingAvp
 		e = diameter.InvalidAVP{Code: result, AVP: diameter.SetSessionID("")}
+	} else if av := common.QueryDB(impi); len(av.RAND) == 0 {
+		result = bag.IdentityUnknown
+		e = errors.New("identity not found")
 	} else {
-		av := common.QueryDB(impi)
-		if len(av.RAND) == 0 {
-			result = bag.IdentityUnknown
-			e = errors.New("identity not found")
-		} else {
-			auth = bag.SetSIPAuthDataItem(av.RAND, av.AUTN, nil, av.RES, av.CK, av.IK)
-		}
+		auth = bag.SetSIPAuthDataItem(av.RAND, av.AUTN, nil, av.RES, av.CK, av.IK)
 	}
 
 	res := []diameter.AVP{}
