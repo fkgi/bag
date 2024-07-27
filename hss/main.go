@@ -4,7 +4,6 @@ import (
 	"flag"
 	"fmt"
 	"log"
-	"net"
 	"os"
 	"strings"
 	"syscall"
@@ -34,15 +33,8 @@ func main() {
 	flag.Parse()
 
 	connector.TermSignals = []os.Signal{syscall.SIGINT, syscall.SIGTERM, os.Interrupt}
-	connector.Handle(303, 16777221, 10415, marHandler)
+	diameter.Handle(303, 16777221, 10415, marHandler, connector.DefaultRouter)
 
-	connector.TransportUpNotify = func(c net.Conn) {
-		buf := new(strings.Builder)
-		fmt.Fprintln(buf, "[INFO] transport connection up")
-		fmt.Fprintln(buf, "  | local address: ", c.LocalAddr())
-		fmt.Fprintln(buf, "  | remote address:", c.RemoteAddr())
-		log.Print(buf)
-	}
 	diameter.ConnectionUpNotify = func(c *diameter.Connection) {
 		buf := new(strings.Builder)
 		fmt.Fprintln(buf, "[INFO] DIAMETER connection up")

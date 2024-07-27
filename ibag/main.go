@@ -6,7 +6,6 @@ import (
 	"flag"
 	"fmt"
 	"log"
-	"net"
 	"net/http"
 	"os"
 	"strings"
@@ -28,13 +27,6 @@ func main() {
 
 	connector.TermSignals = []os.Signal{syscall.SIGINT, syscall.SIGTERM, os.Interrupt}
 
-	connector.TransportUpNotify = func(c net.Conn) {
-		buf := new(strings.Builder)
-		fmt.Fprintln(buf, "transport connection up")
-		fmt.Fprintln(buf, "| local address: ", c.LocalAddr())
-		fmt.Fprintln(buf, "| remote address:", c.RemoteAddr())
-		log.Print(buf)
-	}
 	diameter.ConnectionUpNotify = func(c *diameter.Connection) {
 		buf := new(strings.Builder)
 		fmt.Fprintln(buf, "DIAMETER connection up")

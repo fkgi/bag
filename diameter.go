@@ -43,7 +43,7 @@ Multimedia-Auth-Answer
           *[ Route-Record ]
 */
 
-var marHandler = connector.Handle(303, 16777221, 10415, nil)
+var marHandler = diameter.Handle(303, 16777221, 10415, nil, connector.DefaultRouter)
 
 func MultimediaAuthRequest(name string, rand, auts []byte) (av AV, e error) {
 	reqavp := []diameter.AVP{
